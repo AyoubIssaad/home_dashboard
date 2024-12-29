@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home Climate Monitor</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --background-color: #f1f5f9;
+            --card-background: #ffffff;
+            --text-color: #1e293b;
+            --success-color: #10b981;
+            --error-color: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+                Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding: 1rem;
+        }
+
+        .header h1 {
+            color: var(--primary-color);
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: #64748b;
+            font-size: 1rem;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .card {
+            background: var(--card-background);
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+        }
+
+        .card-title {
+            font-size: 1rem;
+            color: #64748b;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .card-status {
+            font-size: 0.875rem;
+            color: var(--success-color);
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .status-badge {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--success-color);
+        }
+
+        .error .status-badge {
+            background-color: var(--error-color);
+        }
+
+        .error .card-value {
+            color: var(--error-color);
+        }
+
+        .update-time {
+            text-align: center;
+            color: #64748b;
+            font-size: 0.875rem;
+            margin-top: 1rem;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .header h1 {
+                font-size: 1.5rem;
+            }
+
+            .card {
+                padding: 1rem;
+            }
+
+            .card-value {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Home Climate Monitor</h1>
+            <p>Real-time temperature and humidity tracking</p>
+        </header>
+
+        <main class="dashboard">
+            <div class="card" id="temp-card">
+                <div class="card-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>
+                    </svg>
+                    Temperature
+                </div>
+                <div class="card-value" id="temperature">--</div>
+                <div class="card-status">
+                    <span class="status-badge"></span>
+                    <span>Live updating</span>
+                </div>
+            </div>
+
+            <div class="card" id="humidity-card">
+                <div class="card-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+                    </svg>
+                    Humidity
+                </div>
+                <div class="card-value" id="humidity">--</div>
+                <div class="card-status">
+                    <span class="status-badge"></span>
+                    <span>Live updating</span>
+                </div>
+            </div>
+        </main>
+
+        <div class="update-time" id="update-time">Last updated: Never</div>
+    </div>
+
+    <script>
+        const eventSource = new EventSource('/sensor-stream');
+        const tempCard = document.getElementById('temp-card');
+        const humidityCard = document.getElementById('humidity-card');
+        const updateTime = document.getElementById('update-time');
+
+        function updateDateTime() {
+            const now = new Date();
+            const options = { 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit',
+                hour12: true
+            };
+            return now.toLocaleTimeString(undefined, options);
+        }
+
+        eventSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            
+            // Update temperature
+            const tempElement = document.getElementById('temperature');
+            tempElement.textContent = `${data.temperature}°C`;
+            tempCard.classList.toggle('error', data.temperature === 'Error');
+
+            // Update humidity
+            const humidityElement = document.getElementById('humidity');
+            humidityElement.textContent = `${data.humidity}%`;
+            humidityCard.classList.toggle('error', data.humidity === 'Error');
+
+            // Update time
+            updateTime.textContent = `Last updated: ${updateDateTime()}`;
+        };
+
+        eventSource.onerror = function(err) {
+            tempCard.classList.add('error');
+            humidityCard.classList.add('error');
+            updateTime.textContent = `Connection lost at ${updateDateTime()}`;
+        };
+
+        eventSource.onopen = function() {
+            tempCard.classList.remove('error');
+            humidityCard.classList.remove('error');
+        };
+    </script>
+</body>
+</html>
