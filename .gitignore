@@ -1,3 +1,4 @@
 sensor-env/
 sensor.log
 dashboard.log
+climate_data.db
