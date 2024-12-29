@@ -104,14 +104,14 @@
         }
 
         .charts-grid {
-            display: grid;
-            grid-template-columns: 1fr;
+            display: flex;
+            flex-direction: column;
             gap: 2rem;
             margin-top: 1rem;
         }
 
         .chart-container {
-            height: 300px;
+            height: 400px;
             position: relative;
         }
 
@@ -127,12 +127,6 @@
             color: #64748b;
             margin-top: 1rem;
             font-size: 0.875rem;
-        }
-
-        @media (min-width: 1024px) {
-            .charts-grid {
-                grid-template-columns: 1fr 1fr;
-            }
         }
     </style>
 </head>
@@ -225,13 +219,11 @@
                 data: {
                     datasets: [{
                         label: 'Temperature',
-                        borderColor: '#2563eb',
                         data: [],
+                        fill: false,
+                        borderColor: '#2563eb',
                         borderWidth: 2,
-                        pointRadius: 2,
-                        spanGaps: true,
-                        showLine: true,
-                        fill: false
+                        tension: 0.3
                     }]
                 },
                 options: {
@@ -254,13 +246,11 @@
                 data: {
                     datasets: [{
                         label: 'Humidity',
-                        borderColor: '#10b981',
                         data: [],
+                        fill: false,
+                        borderColor: '#10b981',
                         borderWidth: 2,
-                        pointRadius: 2,
-                        spanGaps: true,
-                        showLine: true,
-                        fill: false
+                        tension: 0.3
                     }]
                 },
                 options: {
@@ -308,13 +298,18 @@
                     const response = await fetch(`/api/history/${currentPeriod}`);
                     const data = await response.json();
                     
-                    temperatureChart.data.datasets[0].data = data.map(d => ({
+                    // Sort data by timestamp before updating charts
+                    const sortedData = data.sort((a, b) => 
+                        new Date(a.timestamp) - new Date(b.timestamp)
+                    );
+
+                    temperatureChart.data.datasets[0].data = sortedData.map(d => ({
                         x: new Date(d.timestamp),
                         y: d.temperature
                     }));
                     temperatureChart.update('none');
 
-                    humidityChart.data.datasets[0].data = data.map(d => ({
+                    humidityChart.data.datasets[0].data = sortedData.map(d => ({
                         x: new Date(d.timestamp),
                         y: d.humidity
                     }));
