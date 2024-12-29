@@ -61,7 +61,6 @@
             font-size: 2rem;
             font-weight: bold;
             color: var(--primary-color);
-            margin-bottom: 0.5rem;
         }
 
         .error .card-value {
@@ -76,51 +75,10 @@
             margin-top: 2rem;
         }
 
-        .date-controls {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-            align-items: center;
-            flex-wrap: wrap;
-            padding: 1rem;
-            background-color: #f8fafc;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-        }
-
-        .date-input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .date-input-group label {
-            font-size: 0.875rem;
-            color: #64748b;
-            font-weight: 500;
-        }
-
-        .date-input {
-            padding: 0.625rem;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            font-size: 0.875rem;
-            background-color: white;
-            color: var(--text-color);
-            transition: border-color 0.2s;
-        }
-
-        .date-input:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
-        }
-
         .quick-select {
             display: flex;
             gap: 0.5rem;
-            align-items: center;
-            margin-left: auto;
+            margin-bottom: 1.5rem;
         }
 
         .quick-select button {
@@ -176,14 +134,6 @@
                 grid-template-columns: 1fr 1fr;
             }
         }
-
-        @media (max-width: 640px) {
-            .quick-select {
-                margin-left: 0;
-                width: 100%;
-                justify-content: space-between;
-            }
-        }
     </style>
 </head>
 <body>
@@ -192,38 +142,20 @@
             <div class="card" id="temp-card">
                 <div class="card-title">Temperature</div>
                 <div class="card-value" id="temperature">--</div>
-                <div class="status-text">
-                    <span class="status-dot"></span>
-                    <span>Live updating</span>
-                </div>
             </div>
 
             <div class="card" id="humidity-card">
                 <div class="card-title">Humidity</div>
                 <div class="card-value" id="humidity">--</div>
-                <div class="status-text">
-                    <span class="status-dot"></span>
-                    <span>Live updating</span>
-                </div>
             </div>
         </div>
 
         <div class="chart-section">
-            <div class="date-controls">
-                <div class="date-input-group">
-                    <label for="startDate">From</label>
-                    <input type="datetime-local" id="startDate" class="date-input">
-                </div>
-                <div class="date-input-group">
-                    <label for="endDate">To</label>
-                    <input type="datetime-local" id="endDate" class="date-input">
-                </div>
-                <div class="quick-select">
-                    <button data-hours="24" class="active">24h</button>
-                    <button data-hours="48">48h</button>
-                    <button data-hours="72">72h</button>
-                    <button data-hours="168">1w</button>
-                </div>
+            <div class="quick-select">
+                <button data-hours="24" class="active">24h</button>
+                <button data-hours="48">48h</button>
+                <button data-hours="72">72h</button>
+                <button data-hours="168">1w</button>
             </div>
             <div class="charts-grid">
                 <div>
@@ -246,13 +178,11 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const eventSource = new EventSource('/sensor-stream');
             const tempCard = document.getElementById('temp-card');
             const humidityCard = document.getElementById('humidity-card');
             const updateTime = document.getElementById('update-time');
-            const startDateInput = document.getElementById('startDate');
-            const endDateInput = document.getElementById('endDate');
             const quickSelectButtons = document.querySelectorAll('.quick-select button');
+            let currentPeriod = 24; // Default to 24 hours
 
             // Initialize the charts
             const tempCtx = document.getElementById('temperatureChart').getContext('2d');
@@ -271,9 +201,8 @@
                     x: {
                         type: 'time',
                         time: {
-                            unit: 'minute',
+                            unit: 'hour',
                             displayFormats: {
-                                minute: 'HH:mm',
                                 hour: 'MMM D, HH:mm'
                             }
                         },
@@ -298,9 +227,11 @@
                         label: 'Temperature',
                         borderColor: '#2563eb',
                         data: [],
-                        tension: 0.4,
                         borderWidth: 2,
-                        pointRadius: 1
+                        pointRadius: 2,
+                        spanGaps: true,
+                        showLine: true,
+                        fill: false
                     }]
                 },
                 options: {
@@ -325,9 +256,11 @@
                         label: 'Humidity',
                         borderColor: '#10b981',
                         data: [],
-                        tension: 0.4,
                         borderWidth: 2,
-                        pointRadius: 1
+                        pointRadius: 2,
+                        spanGaps: true,
+                        showLine: true,
+                        fill: false
                     }]
                 },
                 options: {
@@ -345,51 +278,45 @@
                 }
             });
 
-            function setDateRange(hours) {
-                const end = new Date();
-                const start = new Date(end - hours * 60 * 60 * 1000);
-                
-                endDateInput.value = end.toISOString().slice(0, 16);
-                startDateInput.value = start.toISOString().slice(0, 16);
-                
-                updateHistoricalData();
-            }
-
-            // Quick select button handlers
-            quickSelectButtons.forEach(button => {
-                button.addEventListener('click', () => {
-                    quickSelectButtons.forEach(b => b.classList.remove('active'));
-                    button.classList.add('active');
-                    setDateRange(parseInt(button.dataset.hours));
-                });
-            });
-
-            function updateDateTime() {
-                return new Date().toLocaleTimeString();
-            }
-
-            async function updateHistoricalData() {
+            // Fetch and update current readings
+            async function updateCurrentReadings() {
                 try {
-                    const response = await fetch('/historical-data');
+                    const response = await fetch('/api/current');
                     const data = await response.json();
                     
-                    const startDate = new Date(startDateInput.value).getTime();
-                    const endDate = new Date(endDateInput.value).getTime();
-                    
-                    const filteredData = data.filter(d => {
-                        const timestamp = new Date(d.timestamp).getTime();
-                        return timestamp >= startDate && timestamp <= endDate;
-                    }).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                    if (data) {
+                        document.getElementById('temperature').textContent = `${data.temperature.toFixed(1)}°C`;
+                        document.getElementById('humidity').textContent = `${data.humidity.toFixed(1)}%`;
+                        updateTime.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+                        
+                        tempCard.classList.remove('error');
+                        humidityCard.classList.remove('error');
+                    } else {
+                        tempCard.classList.add('error');
+                        humidityCard.classList.add('error');
+                    }
+                } catch (error) {
+                    console.error('Error fetching current data:', error);
+                    tempCard.classList.add('error');
+                    humidityCard.classList.add('error');
+                }
+            }
 
-                    temperatureChart.data.datasets[0].data = filteredData.map(d => ({
+            // Fetch and update historical data
+            async function updateHistoricalData() {
+                try {
+                    const response = await fetch(`/api/history/${currentPeriod}`);
+                    const data = await response.json();
+                    
+                    temperatureChart.data.datasets[0].data = data.map(d => ({
                         x: new Date(d.timestamp),
-                        y: parseFloat(d.temperature)
+                        y: d.temperature
                     }));
                     temperatureChart.update('none');
 
-                    humidityChart.data.datasets[0].data = filteredData.map(d => ({
+                    humidityChart.data.datasets[0].data = data.map(d => ({
                         x: new Date(d.timestamp),
-                        y: parseFloat(d.humidity)
+                        y: d.humidity
                     }));
                     humidityChart.update('none');
                 } catch (error) {
@@ -397,55 +324,23 @@
                 }
             }
 
-            startDateInput.addEventListener('change', updateHistoricalData);
-            endDateInput.addEventListener('change', updateHistoricalData);
+            // Quick select button handlers
+            quickSelectButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    quickSelectButtons.forEach(b => b.classList.remove('active'));
+                    button.classList.add('active');
+                    currentPeriod = parseInt(button.dataset.hours);
+                    updateHistoricalData();
+                });
+            });
 
-            // Set initial 24-hour range
-            setDateRange(24);
+            // Initial updates
+            updateCurrentReadings();
+            updateHistoricalData();
             
-            // Update every 2 minutes
-            setInterval(updateHistoricalData, 120000);
-
-            eventSource.onmessage = function(event) {
-                const data = JSON.parse(event.data);
-                
-                document.getElementById('temperature').textContent = 
-                    data.temperature === 'Error' ? 'Error' : `${data.temperature}°C`;
-                tempCard.classList.toggle('error', data.temperature === 'Error');
-
-                document.getElementById('humidity').textContent = 
-                    data.humidity === 'Error' ? 'Error' : `${data.humidity}%`;
-                humidityCard.classList.toggle('error', data.humidity === 'Error');
-
-                updateTime.textContent = `Last updated: ${updateDateTime()}`;
-
-                if (data.temperature !== 'Error' && data.humidity !== 'Error') {
-                    const now = new Date();
-                    
-                    temperatureChart.data.datasets[0].data.push({
-                        x: now,
-                        y: parseFloat(data.temperature)
-                    });
-                    temperatureChart.update('none');
-
-                    humidityChart.data.datasets[0].data.push({
-                        x: now,
-                        y: parseFloat(data.humidity)
-                    });
-                    humidityChart.update('none');
-                }
-            };
-
-            eventSource.onerror = function(err) {
-                tempCard.classList.add('error');
-                humidityCard.classList.add('error');
-                updateTime.textContent = `Connection lost at ${updateDateTime()}`;
-            };
-
-            eventSource.onopen = function() {
-                tempCard.classList.remove('error');
-                humidityCard.classList.remove('error');
-            };
+            // Set up periodic updates
+            setInterval(updateCurrentReadings, 120000); // Every 2 minutes
+            setInterval(updateHistoricalData, 120000); // Every 2 minutes
         });
     </script>
 </body>

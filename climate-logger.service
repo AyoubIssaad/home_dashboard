@@ -1,0 +1,14 @@
+[Unit]
+Description=Climate Monitor Logger
+After=network.target
+
+[Service]
+User=aub
+WorkingDirectory=/home/aub/lab/home_dashboard
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/aub/lab/home_dashboard/sensor-env/bin/python sensor_logger.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
