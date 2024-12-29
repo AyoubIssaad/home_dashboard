@@ -218,12 +218,15 @@
                 type: 'line',
                 data: {
                     datasets: [{
-                        label: 'Temperature',
+			label: 'Temperature',
                         data: [],
-                        fill: false,
+                        fill: true,
+                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
                         borderColor: '#2563eb',
                         borderWidth: 2,
-                        tension: 0.3
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHitRadius: 10
                     }]
                 },
                 options: {
@@ -244,13 +247,16 @@
             const humidityChart = new Chart(humidityCtx, {
                 type: 'line',
                 data: {
-                    datasets: [{
-                        label: 'Humidity',
-                        data: [],
-                        fill: false,
-                        borderColor: '#10b981',
-                        borderWidth: 2,
-                        tension: 0.3
+	    datasets: [{
+		label: 'Humidity', 
+		data: [], 
+		fill: true, 
+		backgroundColor: 'rgba(16, 185, 129, 0.1)', 
+		borderColor: '#10b981', 
+		borderWidth: 2, 
+		tension: 0.4, 
+		pointRadius: 0, 
+		pointHitRadius: 10
                     }]
                 },
                 options: {
