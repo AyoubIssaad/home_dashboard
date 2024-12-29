@@ -1,0 +1,16 @@
+[Unit]
+Description=Home Sensor Dashboard Web Application
+After=network.target
+
+[Service]
+User=aub
+WorkingDirectory=/home/aub/lab/home_dashboard
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/aub/lab/home_dashboard/start_sensor.sh
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/aub/lab/home_dashboard/dashboard.log
+StandardError=append:/home/aub/lab/home_dashboard/dashboard.log
+
+[Install]
+WantedBy=multi-user.target
