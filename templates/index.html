@@ -8,7 +8,6 @@
     <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.1/dist/chartjs-adapter-moment.min.js"></script>
     <style>
-        /* Existing styles remain the same */
         :root {
             --primary-color: #2563eb;
             --background-color: #f1f5f9;
@@ -38,6 +37,13 @@
             padding: 20px;
         }
 
+        .update-time {
+            text-align: right;
+            color: #64748b;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+        }
+
         .dashboard {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -62,6 +68,12 @@
             font-size: 2rem;
             font-weight: bold;
             color: var(--primary-color);
+        }
+
+        .card-subtitle {
+            font-size: 0.875rem;
+            color: #94a3b8;
+            margin-top: 0.25rem;
         }
 
         .error .card-value {
@@ -125,11 +137,65 @@
             font-weight: 500;
         }
 
-        .update-time {
-            text-align: right;
-            color: #64748b;
-            margin-bottom: 1rem;
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 0.5rem;
             font-size: 0.875rem;
+        }
+
+        .stat-label {
+            color: #64748b;
+        }
+
+        .stat-value {
+            font-weight: 500;
+        }
+
+        .trend-indicator {
+            font-size: 0.875rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            margin-top: 0.5rem;
+        }
+
+        .trend-up {
+            background-color: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+        }
+
+        .trend-down {
+            background-color: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+        }
+
+        .trend-stable {
+            background-color: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+        }
+
+        .comfort-indicator {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+        }
+
+        .comfort-good {
+            background-color: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+        }
+
+        .comfort-warning {
+            background-color: rgba(245, 158, 11, 0.1);
+            color: #f59e0b;
+        }
+
+        .comfort-alert {
+            background-color: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
         }
     </style>
 </head>
@@ -141,11 +207,52 @@
             <div class="card" id="temp-card">
                 <div class="card-title">Temperature</div>
                 <div class="card-value" id="temperature">--</div>
+                <div class="trend-indicator" id="temp-trend"></div>
+                <div class="stat-row">
+                    <span class="stat-label">24h High</span>
+                    <span class="stat-value" id="temp-high">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">24h Low</span>
+                    <span class="stat-value" id="temp-low">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">24h Avg</span>
+                    <span class="stat-value" id="temp-avg">--</span>
+                </div>
             </div>
 
             <div class="card" id="humidity-card">
                 <div class="card-title">Humidity</div>
                 <div class="card-value" id="humidity">--</div>
+                <div class="trend-indicator" id="humidity-trend"></div>
+                <div class="stat-row">
+                    <span class="stat-label">24h High</span>
+                    <span class="stat-value" id="humidity-high">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">24h Low</span>
+                    <span class="stat-value" id="humidity-low">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">24h Avg</span>
+                    <span class="stat-value" id="humidity-avg">--</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Comfort Metrics</div>
+                <div class="card-value" id="dewpoint">--</div>
+                <div class="card-subtitle">Dew Point</div>
+                <div class="comfort-indicator" id="comfort-status">--</div>
+                <div class="stat-row">
+                    <span class="stat-label">Heat Index</span>
+                    <span class="stat-value" id="heat-index">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Rate of Change</span>
+                    <span class="stat-value" id="temp-change-rate">--</span>
+                </div>
             </div>
         </div>
 
@@ -175,228 +282,295 @@
                 </div>
             </div>
         </div>
-
     </div>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const tempCard = document.getElementById('temp-card');
-            const humidityCard = document.getElementById('humidity-card');
-            const updateTime = document.getElementById('update-time');
-            const quickSelectButtons = document.querySelectorAll('.quick-select button');
-            let currentPeriod = 12; // Default to 12 hours
-
-            // Initialize the charts
-            const tempCtx = document.getElementById('temperatureChart').getContext('2d');
-            const humidityCtx = document.getElementById('humidityChart').getContext('2d');
-
-            // Function to determine appropriate time unit based on period
-            function getTimeUnit(hours) {
-                if (hours <= 24) return 'hour';
-                if (hours <= 168) return 'day'; // 1 week
-                return 'week';
-            }
-
-            // Common chart options with dynamic time units
-            function getChartOptions(hours) {
-                return {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        x: {
-                            type: 'time',
-                            time: {
-                                unit: getTimeUnit(hours),
-                                displayFormats: {
-                                    hour: 'MMM D, HH:mm',
-                                    day: 'MMM D',
-                                    week: 'MMM D'
-                                }
-                            },
-                            title: {
-                                display: true,
-                                text: 'Time'
-                            }
-                        },
-                        y: {
-                            beginAtZero: false,
-                            title: {
-                                display: true
-                            },
-                            ticks: {
-                                callback: function(value, index, values) {
-                                    return value.toFixed(2);
-                                }
-                            }
-                        }
-                    }
-                };
-            }
-
-            const temperatureChart = new Chart(tempCtx, {
-                type: 'line',
-                data: {
-                    datasets: [{
-                        label: 'Temperature',
-                        data: [],
-                        fill: true,
-                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                        borderColor: '#2563eb',
-                        borderWidth: 2,
-                        tension: 0.4,
-                        pointRadius: 0,
-                        pointHitRadius: 10
-                    }]
-                },
-                options: {
-                    ...getChartOptions(24),
-                    scales: {
-                        ...getChartOptions(24).scales,
-                        y: {
-                            ...getChartOptions(24).scales.y,
-                            title: {
-                                display: true,
-                                text: 'Temperature (°C)'
-                            }
-                        }
-                    }
-                }
-            });
-
-            const humidityChart = new Chart(humidityCtx, {
-                type: 'line',
-                data: {
-                    datasets: [{
-                        label: 'Humidity',
-                        data: [],
-                        fill: true,
-                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                        borderColor: '#10b981',
-                        borderWidth: 2,
-                        tension: 0.4,
-                        pointRadius: 0,
-                        pointHitRadius: 10
-                    }]
-                },
-                options: {
-                    ...getChartOptions(24),
-                    scales: {
-                        ...getChartOptions(24).scales,
-                        y: {
-                            ...getChartOptions(24).scales.y,
-                            title: {
-                                display: true,
-                                text: 'Humidity (%)'
-                            }
-                        }
-                    }
-                }
-            });
-
-            // Update chart options based on time period
-            function updateChartOptions(hours) {
-                const newOptions = getChartOptions(hours);
-                
-                temperatureChart.options.scales.x = newOptions.scales.x;
-                humidityChart.options.scales.x = newOptions.scales.x;
-                
-                temperatureChart.update('none');
-                humidityChart.update('none');
-            }
-
-            // Fetch and update current readings
-            async function updateCurrentReadings() {
-                try {
-                    const response = await fetch('/api/current');
-                    const data = await response.json();
-                    
-                    if (data) {
-                        document.getElementById('temperature').textContent = `${data.temperature.toFixed(1)}°C`;
-                        document.getElementById('humidity').textContent = `${data.humidity.toFixed(1)}%`;
-                        updateTime.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
-                        
-                        tempCard.classList.remove('error');
-                        humidityCard.classList.remove('error');
-                    } else {
-                        tempCard.classList.add('error');
-                        humidityCard.classList.add('error');
-                    }
-                } catch (error) {
-                    console.error('Error fetching current data:', error);
-                    tempCard.classList.add('error');
-                    humidityCard.classList.add('error');
-                }
-            }
-
-            // Fetch and update historical data
-            async function updateHistoricalData() {
-                try {
-                    const response = await fetch(`/api/history/${currentPeriod}`);
-                    const data = await response.json();
-                    
-                    // Sort data by timestamp before updating charts
-                    const sortedData = data.sort((a, b) => 
-                        new Date(a.timestamp) - new Date(b.timestamp)
-                    );
-
-                    // Calculate min and max for temperature
-                    const tempValues = sortedData.map(d => d.temperature);
-                    const tempMin = Math.min(...tempValues);
-                    const tempMax = Math.max(...tempValues);
-                    const tempPadding = (tempMax - tempMin) * 0.1;  // 10% padding
-
-                    // Calculate min and max for humidity
-                    const humValues = sortedData.map(d => d.humidity);
-                    const humMin = Math.min(...humValues);
-                    const humMax = Math.max(...humValues);
-                    const humPadding = (humMax - humMin) * 0.1;  // 10% padding
-
-                    // Update temperature chart
-                    temperatureChart.options.scales.y.min = tempMin - tempPadding;
-                    temperatureChart.options.scales.y.max = tempMax + tempPadding;
-                    temperatureChart.data.datasets[0].data = sortedData.map(d => ({
-                        x: new Date(d.timestamp),
-                        y: d.temperature
-                    }));
-                    temperatureChart.update();
-
-                    // Update humidity chart
-                    humidityChart.options.scales.y.min = humMin - humPadding;
-                    humidityChart.options.scales.y.max = humMax + humPadding;
-                    humidityChart.data.datasets[0].data = sortedData.map(d => ({
-                        x: new Date(d.timestamp),
-                        y: d.humidity
-                    }));
-                    humidityChart.update();
-                } catch (error) {
-                    console.error('Error fetching historical data:', error);
-                }
-            }
-
-            // Quick select button handlers
-            quickSelectButtons.forEach(button => {
-                button.addEventListener('click', () => {
-                    quickSelectButtons.forEach(b => b.classList.remove('active'));
-                    button.classList.add('active');
-                    currentPeriod = parseInt(button.dataset.hours);
-                    updateChartOptions(currentPeriod);
-                    updateHistoricalData();
-                });
-            });
-
-            // Initial updates
-            updateCurrentReadings();
-            updateHistoricalData();
-            
-            // Set up periodic updates
-            setInterval(updateCurrentReadings, 120000); // Every 2 minutes
-            setInterval(updateHistoricalData, 120000); // Every 2 minutes
-        });
-    </script>
 </body>
 </html>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tempCard = document.getElementById('temp-card');
+    const humidityCard = document.getElementById('humidity-card');
+    const updateTime = document.getElementById('update-time');
+    const quickSelectButtons = document.querySelectorAll('.quick-select button');
+    let currentPeriod = 12; // Default to 12 hours
+
+    // Function to determine appropriate time unit based on period
+    function getTimeUnit(hours) {
+        if (hours <= 24) return 'hour';
+        if (hours <= 168) return 'day'; // 1 week
+        return 'week';
+    }
+
+    // Common chart options
+    function getChartOptions(hours) {
+        return {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                x: {
+                    type: 'time',
+                    time: {
+                        unit: getTimeUnit(hours),
+                        displayFormats: {
+                            hour: 'MMM D, HH:mm',
+                            day: 'MMM D',
+                            week: 'MMM D'
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Time'
+                    }
+                },
+                y: {
+                    beginAtZero: false,
+                    title: {
+                        display: true
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return value.toFixed(2);
+                        }
+                    }
+                }
+            }
+        };
+    }
+
+    // Initialize temperature chart
+    const temperatureChart = new Chart(document.getElementById('temperatureChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            datasets: [{
+                label: 'Temperature',
+                data: [],
+                fill: true,
+                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                borderColor: '#2563eb',
+                borderWidth: 2,
+                tension: 0.4,
+                pointRadius: 0,
+                pointHitRadius: 10
+            }]
+        },
+        options: {
+            ...getChartOptions(12),
+            scales: {
+                ...getChartOptions(12).scales,
+                y: {
+                    ...getChartOptions(12).scales.y,
+                    title: {
+                        display: true,
+                        text: 'Temperature (°C)'
+                    }
+                }
+            }
+        }
+    });
+
+    // Initialize humidity chart
+    const humidityChart = new Chart(document.getElementById('humidityChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            datasets: [{
+                label: 'Humidity',
+                data: [],
+                fill: true,
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                borderColor: '#10b981',
+                borderWidth: 2,
+                tension: 0.4,
+                pointRadius: 0,
+                pointHitRadius: 10
+            }]
+        },
+        options: {
+            ...getChartOptions(12),
+            scales: {
+                ...getChartOptions(12).scales,
+                y: {
+                    ...getChartOptions(12).scales.y,
+                    title: {
+                        display: true,
+                        text: 'Humidity (%)'
+                    }
+                }
+            }
+        }
+    });
+
+    // Calculate dew point using Magnus formula
+    function calculateDewPoint(temp, humidity) {
+        const a = 17.27;
+        const b = 237.7;
+        const alpha = ((a * temp) / (b + temp)) + Math.log(humidity/100);
+        return (b * alpha) / (a - alpha);
+    }
+
+    // Calculate heat index using NOAA formula
+    function calculateHeatIndex(temp, humidity) {
+        // Convert Celsius to Fahrenheit for the calculation
+        const tempF = (temp * 9/5) + 32;
+        let hi = 0.5 * (tempF + 61.0 + ((tempF - 68.0) * 1.2) + (humidity * 0.094));
+        
+        if (hi > 79) {
+            hi = -42.379 + 2.04901523 * tempF + 10.14333127 * humidity
+                - 0.22475541 * tempF * humidity - 6.83783 * Math.pow(10, -3) * tempF * tempF
+                - 5.481717 * Math.pow(10, -2) * humidity * humidity
+                + 1.22874 * Math.pow(10, -3) * tempF * tempF * humidity
+                + 8.5282 * Math.pow(10, -4) * tempF * humidity * humidity
+                - 1.99 * Math.pow(10, -6) * tempF * tempF * humidity * humidity;
+        }
+        
+        // Convert back to Celsius
+        return (hi - 32) * 5/9;
+    }
+
+    // Get comfort status based on dew point
+    function getComfortStatus(temp, humidity) {
+        const dewPoint = calculateDewPoint(temp, humidity);
+        
+        if (dewPoint < 12) return { text: 'Very Comfortable', class: 'comfort-good' };
+        if (dewPoint < 16) return { text: 'Comfortable', class: 'comfort-good' };
+        if (dewPoint < 18) return { text: 'Somewhat Comfortable', class: 'comfort-warning' };
+        if (dewPoint < 21) return { text: 'Somewhat Uncomfortable', class: 'comfort-warning' };
+        return { text: 'Very Uncomfortable', class: 'comfort-alert' };
+    }
+
+    // Update chart options based on time period
+    function updateChartOptions(hours) {
+        const newOptions = getChartOptions(hours);
+        temperatureChart.options.scales.x = newOptions.scales.x;
+        humidityChart.options.scales.x = newOptions.scales.x;
+        temperatureChart.update('none');
+        humidityChart.update('none');
+    }
+
+    // Fetch and update current readings
+    async function updateCurrentReadings() {
+        try {
+            const response = await fetch('/api/current');
+            const data = await response.json();
+            
+            if (data) {
+                document.getElementById('temperature').textContent = `${data.temperature.toFixed(1)}°C`;
+                document.getElementById('humidity').textContent = `${data.humidity.toFixed(1)}%`;
+                updateTime.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+                
+                tempCard.classList.remove('error');
+                humidityCard.classList.remove('error');
+            } else {
+                tempCard.classList.add('error');
+                humidityCard.classList.add('error');
+            }
+        } catch (error) {
+            console.error('Error fetching current data:', error);
+            tempCard.classList.add('error');
+            humidityCard.classList.add('error');
+        }
+    }
+
+    // Fetch and update historical data
+    async function updateHistoricalData() {
+        try {
+            const response = await fetch(`/api/history/${currentPeriod}`);
+            const data = await response.json();
+            
+            // Sort data by timestamp before updating charts
+            const sortedData = data.sort((a, b) => 
+                new Date(a.timestamp) - new Date(b.timestamp)
+            );
+
+            // Calculate min/max/avg for temperature
+            const tempStats = {
+                max: Math.max(...sortedData.map(d => d.temperature)),
+                min: Math.min(...sortedData.map(d => d.temperature)),
+                avg: (sortedData.reduce((sum, d) => sum + d.temperature, 0) / sortedData.length)
+            };
+
+            // Calculate min/max/avg for humidity
+            const humStats = {
+                max: Math.max(...sortedData.map(d => d.humidity)),
+                min: Math.min(...sortedData.map(d => d.humidity)),
+                avg: (sortedData.reduce((sum, d) => sum + d.humidity, 0) / sortedData.length)
+            };
+
+            // Update temperature stats
+            document.getElementById('temp-high').textContent = `${tempStats.max.toFixed(1)}°C`;
+            document.getElementById('temp-low').textContent = `${tempStats.min.toFixed(1)}°C`;
+            document.getElementById('temp-avg').textContent = `${tempStats.avg.toFixed(1)}°C`;
+
+            // Update humidity stats
+            document.getElementById('humidity-high').textContent = `${humStats.max.toFixed(1)}%`;
+            document.getElementById('humidity-low').textContent = `${humStats.min.toFixed(1)}%`;
+            document.getElementById('humidity-avg').textContent = `${humStats.avg.toFixed(1)}%`;
+
+            // Calculate comfort metrics
+            const currentTemp = sortedData[sortedData.length - 1].temperature;
+            const currentHum = sortedData[sortedData.length - 1].humidity;
+            
+            // Calculate and update dew point
+            const dewPoint = calculateDewPoint(currentTemp, currentHum);
+            document.getElementById('dewpoint').textContent = `${dewPoint.toFixed(1)}°C`;
+
+            // Calculate and update heat index
+            const heatIndex = calculateHeatIndex(currentTemp, currentHum);
+            document.getElementById('heat-index').textContent = `${heatIndex.toFixed(1)}°C`;
+
+            // Calculate and update comfort status
+            const comfort = getComfortStatus(currentTemp, currentHum);
+            const comfortElement = document.getElementById('comfort-status');
+            comfortElement.textContent = comfort.text;
+            comfortElement.className = `comfort-indicator ${comfort.class}`;
+
+            // Calculate rate of change (over last hour)
+            const hourAgoIndex = sortedData.length - 30; // 30 readings = 1 hour
+            if (hourAgoIndex >= 0) {
+                const hourAgoTemp = sortedData[hourAgoIndex].temperature;
+                const rateOfChange = (currentTemp - hourAgoTemp);
+                document.getElementById('temp-change-rate').textContent = 
+                    `${rateOfChange.toFixed(2)}°C/hr`;
+            }
+
+            // Update chart data
+            temperatureChart.data.datasets[0].data = sortedData.map(d => ({
+                x: new Date(d.timestamp),
+                y: d.temperature
+            }));
+            temperatureChart.update();
+
+            humidityChart.data.datasets[0].data = sortedData.map(d => ({
+                x: new Date(d.timestamp),
+                y: d.humidity
+            }));
+            humidityChart.update();
+
+        } catch (error) {
+            console.error('Error fetching historical data:', error);
+        }
+    }
+
+    // Quick select button handlers
+    quickSelectButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            quickSelectButtons.forEach(b => b.classList.remove('active'));
+            button.classList.add('active');
+            currentPeriod = parseInt(button.dataset.hours);
+            updateChartOptions(currentPeriod);
+            updateHistoricalData();
+        });
+    });
+
+    // Initial updates
+    updateCurrentReadings();
+    updateHistoricalData();
+    
+    // Set up periodic updates
+    setInterval(updateCurrentReadings, 120000); // Every 2 minutes
+    setInterval(updateHistoricalData, 120000); // Every 2 minutes
+});
+</script>
