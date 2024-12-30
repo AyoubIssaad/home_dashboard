@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.1/dist/chartjs-adapter-moment.min.js"></script>
     <style>
+        /* Existing styles remain the same */
         :root {
             --primary-color: #2563eb;
             --background-color: #f1f5f9;
@@ -77,6 +78,7 @@
 
         .quick-select {
             display: flex;
+            flex-wrap: wrap;
             gap: 0.5rem;
             margin-bottom: 1.5rem;
         }
@@ -90,6 +92,7 @@
             font-size: 0.875rem;
             cursor: pointer;
             transition: all 0.2s;
+            min-width: 60px;
         }
 
         .quick-select button:hover {
@@ -146,10 +149,14 @@
 
         <div class="chart-section">
             <div class="quick-select">
+                <button data-hours="1">1h</button>
+                <button data-hours="3">3h</button>
+                <button data-hours="6">6h</button>
+                <button data-hours="12">12h</button>
                 <button data-hours="24" class="active">24h</button>
                 <button data-hours="48">48h</button>
-                <button data-hours="72">72h</button>
                 <button data-hours="168">1w</button>
+                <button data-hours="720">1m</button>
             </div>
             <div class="charts-grid">
                 <div>
@@ -182,43 +189,54 @@
             const tempCtx = document.getElementById('temperatureChart').getContext('2d');
             const humidityCtx = document.getElementById('humidityChart').getContext('2d');
 
-            // Common chart options
-            const commonOptions = {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                },
-                scales: {
-                    x: {
-                        type: 'time',
-                        time: {
-                            unit: 'hour',
-                            displayFormats: {
-                                hour: 'MMM D, HH:mm'
-                            }
-                        },
-                        title: {
-                            display: true,
-                            text: 'Time'
+            // Function to determine appropriate time unit based on period
+            function getTimeUnit(hours) {
+                if (hours <= 24) return 'hour';
+                if (hours <= 168) return 'day'; // 1 week
+                return 'week';
+            }
+
+            // Common chart options with dynamic time units
+            function getChartOptions(hours) {
+                return {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
                         }
                     },
-                    y: {
-                        beginAtZero: false,
-                        title: {
-                            display: true
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: getTimeUnit(hours),
+                                displayFormats: {
+                                    hour: 'MMM D, HH:mm',
+                                    day: 'MMM D',
+                                    week: 'MMM D'
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            }
+                        },
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true
+                            }
                         }
                     }
-                }
-            };
+                };
+            }
 
             const temperatureChart = new Chart(tempCtx, {
                 type: 'line',
                 data: {
                     datasets: [{
-			label: 'Temperature',
+                        label: 'Temperature',
                         data: [],
                         fill: true,
                         backgroundColor: 'rgba(37, 99, 235, 0.1)',
@@ -230,11 +248,11 @@
                     }]
                 },
                 options: {
-                    ...commonOptions,
+                    ...getChartOptions(24),
                     scales: {
-                        ...commonOptions.scales,
+                        ...getChartOptions(24).scales,
                         y: {
-                            ...commonOptions.scales.y,
+                            ...getChartOptions(24).scales.y,
                             title: {
                                 display: true,
                                 text: 'Temperature (°C)'
@@ -247,24 +265,24 @@
             const humidityChart = new Chart(humidityCtx, {
                 type: 'line',
                 data: {
-	    datasets: [{
-		label: 'Humidity', 
-		data: [], 
-		fill: true, 
-		backgroundColor: 'rgba(16, 185, 129, 0.1)', 
-		borderColor: '#10b981', 
-		borderWidth: 2, 
-		tension: 0.4, 
-		pointRadius: 0, 
-		pointHitRadius: 10
+                    datasets: [{
+                        label: 'Humidity',
+                        data: [],
+                        fill: true,
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderColor: '#10b981',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHitRadius: 10
                     }]
                 },
                 options: {
-                    ...commonOptions,
+                    ...getChartOptions(24),
                     scales: {
-                        ...commonOptions.scales,
+                        ...getChartOptions(24).scales,
                         y: {
-                            ...commonOptions.scales.y,
+                            ...getChartOptions(24).scales.y,
                             title: {
                                 display: true,
                                 text: 'Humidity (%)'
@@ -273,6 +291,17 @@
                     }
                 }
             });
+
+            // Update chart options based on time period
+            function updateChartOptions(hours) {
+                const newOptions = getChartOptions(hours);
+                
+                temperatureChart.options.scales.x = newOptions.scales.x;
+                humidityChart.options.scales.x = newOptions.scales.x;
+                
+                temperatureChart.update('none');
+                humidityChart.update('none');
+            }
 
             // Fetch and update current readings
             async function updateCurrentReadings() {
@@ -331,6 +360,7 @@
                     quickSelectButtons.forEach(b => b.classList.remove('active'));
                     button.classList.add('active');
                     currentPeriod = parseInt(button.dataset.hours);
+                    updateChartOptions(currentPeriod);
                     updateHistoricalData();
                 });
             });

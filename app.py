@@ -14,8 +14,8 @@ def get_latest():
         conn.close()
         return {
             'timestamp': row[0],
-            'temperature': round(row[1], 1),  # Round to 1 decimal place
-            'humidity': round(row[2], 1)      # Round to 1 decimal place
+            'temperature': round(row[1], 1),
+            'humidity': round(row[2], 1)
         } if row else None
     except Exception as e:
         print(f"Error getting latest reading: {e}")
@@ -25,10 +25,15 @@ def get_history(hours=24):
     try:
         conn = sqlite3.connect('climate_data.db')
         c = conn.cursor()
+        
+        # Get current time rounded to the minute
+        now = datetime.now().replace(second=0, microsecond=0)
+        start_time = (now - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:00')
+        
         c.execute("""SELECT * FROM readings 
-                     WHERE timestamp > datetime('now', ?) 
+                     WHERE timestamp >= ? 
                      ORDER BY timestamp ASC""", 
-                    (f'-{hours} hours',))
+                    (start_time,))
         rows = c.fetchall()
         conn.close()
         return [{'timestamp': r[0], 
