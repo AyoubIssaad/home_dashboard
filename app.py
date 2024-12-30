@@ -26,19 +26,35 @@ def get_history(hours=24):
         conn = sqlite3.connect('climate_data.db')
         c = conn.cursor()
         
-        # Get current time rounded to the minute
-        now = datetime.now().replace(second=0, microsecond=0)
-        start_time = (now - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:00')
+        # First get the maximum timestamp
+        c.execute("SELECT MAX(timestamp) FROM readings")
+        max_timestamp = c.fetchone()[0]
         
-        c.execute("""SELECT * FROM readings 
-                     WHERE timestamp >= ? 
-                     ORDER BY timestamp ASC""", 
-                    (start_time,))
-        rows = c.fetchall()
-        conn.close()
-        return [{'timestamp': r[0], 
-                 'temperature': r[1], 
-                 'humidity': r[2]} for r in rows]
+        if max_timestamp:
+            # Calculate the start time based on the requested hours
+            latest_time = datetime.strptime(max_timestamp, '%Y-%m-%d %H:%M:%S')
+            start_time = latest_time - timedelta(hours=hours)
+            
+            # Get data only between start_time and latest_time
+            c.execute("""
+                SELECT * FROM readings 
+                WHERE datetime(timestamp) > datetime(?) 
+                AND datetime(timestamp) <= datetime(?)
+                ORDER BY timestamp ASC
+            """, (start_time.strftime('%Y-%m-%d %H:%M:%S'), 
+                 latest_time.strftime('%Y-%m-%d %H:%M:%S')))
+            
+            rows = c.fetchall()
+            conn.close()
+            return [{
+                'timestamp': r[0],
+                'temperature': r[1],
+                'humidity': r[2]
+            } for r in rows]
+        else:
+            conn.close()
+            return []
+            
     except Exception as e:
         print(f"Error getting history: {e}")
         return []

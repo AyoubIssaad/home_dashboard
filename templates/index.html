@@ -126,15 +126,17 @@
         }
 
         .update-time {
-            text-align: center;
+            text-align: right;
             color: #64748b;
-            margin-top: 1rem;
+            margin-bottom: 1rem;
             font-size: 0.875rem;
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="update-time" id="update-time">Last updated: Never</div>
+        
         <div class="dashboard">
             <div class="card" id="temp-card">
                 <div class="card-title">Temperature</div>
@@ -152,8 +154,8 @@
                 <button data-hours="1">1h</button>
                 <button data-hours="3">3h</button>
                 <button data-hours="6">6h</button>
-                <button data-hours="12">12h</button>
-                <button data-hours="24" class="active">24h</button>
+                <button data-hours="12" class="active">12h</button>
+                <button data-hours="24">24h</button>
                 <button data-hours="48">48h</button>
                 <button data-hours="168">1w</button>
                 <button data-hours="720">1m</button>
@@ -174,7 +176,6 @@
             </div>
         </div>
 
-        <div class="update-time" id="update-time">Last updated: Never</div>
     </div>
 
     <script>
@@ -183,7 +184,7 @@
             const humidityCard = document.getElementById('humidity-card');
             const updateTime = document.getElementById('update-time');
             const quickSelectButtons = document.querySelectorAll('.quick-select button');
-            let currentPeriod = 24; // Default to 24 hours
+            let currentPeriod = 12; // Default to 12 hours
 
             // Initialize the charts
             const tempCtx = document.getElementById('temperatureChart').getContext('2d');
@@ -226,6 +227,11 @@
                             beginAtZero: false,
                             title: {
                                 display: true
+                            },
+                            ticks: {
+                                callback: function(value, index, values) {
+                                    return value.toFixed(2);
+                                }
                             }
                         }
                     }
@@ -338,17 +344,35 @@
                         new Date(a.timestamp) - new Date(b.timestamp)
                     );
 
+                    // Calculate min and max for temperature
+                    const tempValues = sortedData.map(d => d.temperature);
+                    const tempMin = Math.min(...tempValues);
+                    const tempMax = Math.max(...tempValues);
+                    const tempPadding = (tempMax - tempMin) * 0.1;  // 10% padding
+
+                    // Calculate min and max for humidity
+                    const humValues = sortedData.map(d => d.humidity);
+                    const humMin = Math.min(...humValues);
+                    const humMax = Math.max(...humValues);
+                    const humPadding = (humMax - humMin) * 0.1;  // 10% padding
+
+                    // Update temperature chart
+                    temperatureChart.options.scales.y.min = tempMin - tempPadding;
+                    temperatureChart.options.scales.y.max = tempMax + tempPadding;
                     temperatureChart.data.datasets[0].data = sortedData.map(d => ({
                         x: new Date(d.timestamp),
                         y: d.temperature
                     }));
-                    temperatureChart.update('none');
+                    temperatureChart.update();
 
+                    // Update humidity chart
+                    humidityChart.options.scales.y.min = humMin - humPadding;
+                    humidityChart.options.scales.y.max = humMax + humPadding;
                     humidityChart.data.datasets[0].data = sortedData.map(d => ({
                         x: new Date(d.timestamp),
                         y: d.humidity
                     }));
-                    humidityChart.update('none');
+                    humidityChart.update();
                 } catch (error) {
                     console.error('Error fetching historical data:', error);
                 }
