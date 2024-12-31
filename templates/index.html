@@ -204,9 +204,12 @@
         <div class="update-time" id="update-time">Last updated: Never</div>
         
         <div class="dashboard">
-            <div class="card" id="temp-card">
+	    <div class="card" id="temp-card">
                 <div class="card-title">Temperature</div>
-                <div class="card-value" id="temperature">--</div>
+                <div style="display: flex; align-items: baseline; gap: 1rem;">
+                    <div class="card-value" id="temperature">--</div>
+                    <div class="card-subtitle" style="white-space: nowrap;" id="outdoor-temp-small">--</div>
+                </div>
                 <div class="trend-indicator" id="temp-trend"></div>
                 <div class="stat-row">
                     <span class="stat-label">24h High</span>
@@ -224,7 +227,10 @@
 
             <div class="card" id="humidity-card">
                 <div class="card-title">Humidity</div>
-                <div class="card-value" id="humidity">--</div>
+                <div style="display: flex; align-items: baseline; gap: 1rem;">
+                    <div class="card-value" id="humidity">--</div>
+                    <div class="card-subtitle" style="white-space: nowrap;" id="outdoor-humidity-small">--</div>
+                </div>
                 <div class="trend-indicator" id="humidity-trend"></div>
                 <div class="stat-row">
                     <span class="stat-label">24h High</span>
@@ -237,6 +243,24 @@
                 <div class="stat-row">
                     <span class="stat-label">24h Avg</span>
                     <span class="stat-value" id="humidity-avg">--</span>
+                </div>
+            </div>
+
+	    <div class="card" id="outdoor-card">
+                <div class="card-title">Outdoor Weather</div>
+                <div class="card-value" id="outdoor-temperature">--</div>
+                <div class="card-subtitle">Temperature</div>
+                <div class="stat-row">
+                    <span class="stat-label">Humidity</span>
+                    <span class="stat-value" id="outdoor-humidity">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Precipitation</span>
+                    <span class="stat-value" id="precipitation">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Precipitation Probability</span>
+                    <span class="stat-value" id="precipitation-probability">--</span>
                 </div>
             </div>
 
@@ -286,9 +310,10 @@
 </body>
 </html>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function() {
     const tempCard = document.getElementById('temp-card');
     const humidityCard = document.getElementById('humidity-card');
+    const outdoorCard = document.getElementById('outdoor-card');
     const updateTime = document.getElementById('update-time');
     const quickSelectButtons = document.querySelectorAll('.quick-select button');
     let currentPeriod = 12; // Default to 12 hours
@@ -450,6 +475,32 @@ document.addEventListener('DOMContentLoaded', function() {
         humidityChart.update('none');
     }
 
+    // Fetch and update outdoor weather
+    async function updateOutdoorWeather() {
+        try {
+            const response = await fetch('/api/outdoor');
+            const data = await response.json();
+            
+            if (data) {
+                document.getElementById('outdoor-temperature').textContent = `${data.temperature.toFixed(1)}°C`;
+                document.getElementById('outdoor-humidity').textContent = `${data.humidity.toFixed(1)}%`;
+                document.getElementById('precipitation').textContent = `${data.precipitation.toFixed(1)} mm`;
+                document.getElementById('precipitation-probability').textContent = `${data.precipitation_probability}%`;
+                
+                // Update small outdoor readings in temperature and humidity cards
+                document.getElementById('outdoor-temp-small').textContent = `Outdoor: ${data.temperature.toFixed(1)}°C`;
+                document.getElementById('outdoor-humidity-small').textContent = `Outdoor: ${data.humidity.toFixed(1)}%`;
+                
+                outdoorCard.classList.remove('error');
+            } else {
+                outdoorCard.classList.add('error');
+            }
+        } catch (error) {
+            console.error('Error fetching outdoor data:', error);
+            outdoorCard.classList.add('error');
+        }
+    }
+
     // Fetch and update current readings
     async function updateCurrentReadings() {
         try {
@@ -460,6 +511,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('temperature').textContent = `${data.temperature.toFixed(1)}°C`;
                 document.getElementById('humidity').textContent = `${data.humidity.toFixed(1)}%`;
                 updateTime.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+                
+                // Calculate and update comfort metrics
+                const dewPoint = calculateDewPoint(data.temperature, data.humidity);
+                document.getElementById('dewpoint').textContent = `${dewPoint.toFixed(1)}°C`;
+
+                const heatIndex = calculateHeatIndex(data.temperature, data.humidity);
+                document.getElementById('heat-index').textContent = `${heatIndex.toFixed(1)}°C`;
+
+                const comfort = getComfortStatus(data.temperature, data.humidity);
+                const comfortElement = document.getElementById('comfort-status');
+                comfortElement.textContent = comfort.text;
+                comfortElement.className = `comfort-indicator ${comfort.class}`;
                 
                 tempCard.classList.remove('error');
                 humidityCard.classList.remove('error');
@@ -509,28 +572,11 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('humidity-low').textContent = `${humStats.min.toFixed(1)}%`;
             document.getElementById('humidity-avg').textContent = `${humStats.avg.toFixed(1)}%`;
 
-            // Calculate comfort metrics
-            const currentTemp = sortedData[sortedData.length - 1].temperature;
-            const currentHum = sortedData[sortedData.length - 1].humidity;
-            
-            // Calculate and update dew point
-            const dewPoint = calculateDewPoint(currentTemp, currentHum);
-            document.getElementById('dewpoint').textContent = `${dewPoint.toFixed(1)}°C`;
-
-            // Calculate and update heat index
-            const heatIndex = calculateHeatIndex(currentTemp, currentHum);
-            document.getElementById('heat-index').textContent = `${heatIndex.toFixed(1)}°C`;
-
-            // Calculate and update comfort status
-            const comfort = getComfortStatus(currentTemp, currentHum);
-            const comfortElement = document.getElementById('comfort-status');
-            comfortElement.textContent = comfort.text;
-            comfortElement.className = `comfort-indicator ${comfort.class}`;
-
             // Calculate rate of change (over last hour)
             const hourAgoIndex = sortedData.length - 30; // 30 readings = 1 hour
             if (hourAgoIndex >= 0) {
                 const hourAgoTemp = sortedData[hourAgoIndex].temperature;
+                const currentTemp = sortedData[sortedData.length - 1].temperature;
                 const rateOfChange = (currentTemp - hourAgoTemp);
                 document.getElementById('temp-change-rate').textContent = 
                     `${rateOfChange.toFixed(2)}°C/hr`;
@@ -568,9 +614,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initial updates
     updateCurrentReadings();
     updateHistoricalData();
+    updateOutdoorWeather();
     
     // Set up periodic updates
     setInterval(updateCurrentReadings, 120000); // Every 2 minutes
     setInterval(updateHistoricalData, 120000); // Every 2 minutes
+    setInterval(updateOutdoorWeather, 120000); // Every 2 minutes
 });
 </script>
