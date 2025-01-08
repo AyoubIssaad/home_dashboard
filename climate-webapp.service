@@ -3,10 +3,10 @@ Description=Climate Monitor Web App
 After=network.target
 
 [Service]
-User=aub
-WorkingDirectory=/home/aub/lab/home_dashboard
+User=dietpi
+WorkingDirectory=/home/dietpi/lab/home_dashboard
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/home/aub/lab/home_dashboard/sensor-env/bin/python app.py
+ExecStart=/home/dietpi/lab/home_dashboard/sensor-env/bin/python app.py
 Restart=always
 RestartSec=10
 

@@ -80,63 +80,6 @@
             color: var(--error-color);
         }
 
-        .chart-section {
-            background: var(--card-background);
-            padding: 1.5rem;
-            border-radius: 12px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            margin-top: 2rem;
-        }
-
-        .quick-select {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .quick-select button {
-            padding: 0.5rem 1rem;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            background-color: white;
-            color: var(--text-color);
-            font-size: 0.875rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            min-width: 60px;
-        }
-
-        .quick-select button:hover {
-            background-color: #f1f5f9;
-            border-color: #94a3b8;
-        }
-
-        .quick-select button.active {
-            background-color: var(--primary-color);
-            color: white;
-            border-color: var(--primary-color);
-        }
-
-        .charts-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 2rem;
-            margin-top: 1rem;
-        }
-
-        .chart-container {
-            height: 400px;
-            position: relative;
-        }
-
-        .chart-title {
-            font-size: 1.1rem;
-            color: var(--text-color);
-            margin-bottom: 1rem;
-            font-weight: 500;
-        }
-
         .stat-row {
             display: flex;
             justify-content: space-between;
@@ -197,6 +140,63 @@
             background-color: rgba(239, 68, 68, 0.1);
             color: #ef4444;
         }
+
+        .chart-section {
+            background: var(--card-background);
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-top: 2rem;
+        }
+
+        .quick-select {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .quick-select button {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background-color: white;
+            color: var(--text-color);
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 60px;
+        }
+
+        .quick-select button:hover {
+            background-color: #f1f5f9;
+            border-color: #94a3b8;
+        }
+
+        .quick-select button.active {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .charts-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            margin-top: 1rem;
+        }
+
+        .chart-container {
+            height: 400px;
+            position: relative;
+        }
+
+        .chart-title {
+            font-size: 1.1rem;
+            color: var(--text-color);
+            margin-bottom: 1rem;
+            font-weight: 500;
+        }
     </style>
 </head>
 <body>
@@ -204,7 +204,7 @@
         <div class="update-time" id="update-time">Last updated: Never</div>
         
         <div class="dashboard">
-	    <div class="card" id="temp-card">
+            <div class="card" id="temp-card">
                 <div class="card-title">Temperature</div>
                 <div style="display: flex; align-items: baseline; gap: 1rem;">
                     <div class="card-value" id="temperature">--</div>
@@ -246,7 +246,7 @@
                 </div>
             </div>
 
-	    <div class="card" id="outdoor-card">
+            <div class="card" id="outdoor-card">
                 <div class="card-title">Outdoor Weather</div>
                 <div class="card-value" id="outdoor-temperature">--</div>
                 <div class="card-subtitle">Temperature</div>
@@ -310,7 +310,7 @@
 </body>
 </html>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function() {
     const tempCard = document.getElementById('temp-card');
     const humidityCard = document.getElementById('humidity-card');
     const outdoorCard = document.getElementById('outdoor-card');
@@ -487,7 +487,6 @@
                 document.getElementById('precipitation').textContent = `${data.precipitation.toFixed(1)} mm`;
                 document.getElementById('precipitation-probability').textContent = `${data.precipitation_probability}%`;
                 
-                // Update small outdoor readings in temperature and humidity cards
                 document.getElementById('outdoor-temp-small').textContent = `Outdoor: ${data.temperature.toFixed(1)}°C`;
                 document.getElementById('outdoor-humidity-small').textContent = `Outdoor: ${data.humidity.toFixed(1)}%`;
                 
@@ -548,28 +547,61 @@
                 new Date(a.timestamp) - new Date(b.timestamp)
             );
 
-            // Calculate min/max/avg for temperature
+            // Format time function
+            const formatTime = (timestamp) => {
+                return new Date(timestamp).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                });
+            };
+
+            // Find max/min temperature with timestamps
+            const tempMax = sortedData.reduce((max, curr) => 
+                curr.temperature > (max?.temperature || -Infinity) ? curr : max
+            );
+            const tempMin = sortedData.reduce((min, curr) => 
+                curr.temperature < (min?.temperature || Infinity) ? curr : min
+            );
+
+            // Calculate temperature stats
             const tempStats = {
-                max: Math.max(...sortedData.map(d => d.temperature)),
-                min: Math.min(...sortedData.map(d => d.temperature)),
+                max: tempMax.temperature,
+                maxTime: tempMax.timestamp,
+                min: tempMin.temperature,
+                minTime: tempMin.timestamp,
                 avg: (sortedData.reduce((sum, d) => sum + d.temperature, 0) / sortedData.length)
             };
 
-            // Calculate min/max/avg for humidity
+            // Find max/min humidity with timestamps
+            const humMax = sortedData.reduce((max, curr) => 
+                curr.humidity > (max?.humidity || -Infinity) ? curr : max
+            );
+            const humMin = sortedData.reduce((min, curr) => 
+                curr.humidity < (min?.humidity || Infinity) ? curr : min
+            );
+
+            // Calculate humidity stats
             const humStats = {
-                max: Math.max(...sortedData.map(d => d.humidity)),
-                min: Math.min(...sortedData.map(d => d.humidity)),
+                max: humMax.humidity,
+                maxTime: humMax.timestamp,
+                min: humMin.humidity,
+                minTime: humMin.timestamp,
                 avg: (sortedData.reduce((sum, d) => sum + d.humidity, 0) / sortedData.length)
             };
 
-            // Update temperature stats
-            document.getElementById('temp-high').textContent = `${tempStats.max.toFixed(1)}°C`;
-            document.getElementById('temp-low').textContent = `${tempStats.min.toFixed(1)}°C`;
+            // Update temperature stats in DOM
+            document.getElementById('temp-high').textContent = 
+                `${tempStats.max.toFixed(1)}°C (${formatTime(tempStats.maxTime)})`;
+            document.getElementById('temp-low').textContent = 
+                `${tempStats.min.toFixed(1)}°C (${formatTime(tempStats.minTime)})`;
             document.getElementById('temp-avg').textContent = `${tempStats.avg.toFixed(1)}°C`;
 
-            // Update humidity stats
-            document.getElementById('humidity-high').textContent = `${humStats.max.toFixed(1)}%`;
-            document.getElementById('humidity-low').textContent = `${humStats.min.toFixed(1)}%`;
+            // Update humidity stats in DOM
+            document.getElementById('humidity-high').textContent = 
+                `${humStats.max.toFixed(1)}% (${formatTime(humStats.maxTime)})`;
+            document.getElementById('humidity-low').textContent = 
+                `${humStats.min.toFixed(1)}% (${formatTime(humStats.minTime)})`;
             document.getElementById('humidity-avg').textContent = `${humStats.avg.toFixed(1)}%`;
 
             // Calculate rate of change (over last hour)
